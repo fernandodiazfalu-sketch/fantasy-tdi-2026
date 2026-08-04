@@ -541,7 +541,7 @@ function rEqDet(div,eq){
   const tf=document.createElement('div');tf.className='tf field-formation';
   const FORMATION_ROWS=[[1,2,3],[4,5],[6,8,7],[9,10],[12,13],[11,15,14]];
   const fechaArg=selFecha==='acum'?undefined:selFecha;
-  const viewingSaved=fechaArg&&eq.historial&&eq.historial[fechaArg];
+  const viewingSaved=fechaArg&&isFechaClosed(fechaArg)&&eq.historial&&eq.historial[fechaArg];
   const fechaClosedNoSave=fechaArg&&!viewingSaved&&isFechaClosed(fechaArg);
   const viewSquad=viewingSaved?eq.historial[fechaArg]:(fechaClosedNoSave?{slots:[],kicker:null,capitan:null}:{slots:eq.slots||[],kicker:eq.kicker,capitan:eq.capitan});
   if(viewingSaved){
