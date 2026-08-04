@@ -285,7 +285,8 @@ async function upsertEq(eq){
     return eq;
   }
   if(eq.id){
-    const{data}=await sb.from('equipos').update({nombre:eq.nombre,slots:eq.slots,kicker:eq.kicker,capitan:eq.capitan||null,apodo:eq.apodo||null,historial:eq.historial||{}}).eq('id',eq.id).select().single();
+    const{data,error}=await sb.from('equipos').update({nombre:eq.nombre,slots:eq.slots,kicker:eq.kicker,capitan:eq.capitan||null,apodo:eq.apodo||null,historial:eq.historial||{}}).eq('id',eq.id).select().single();
+    if(error)throw error;
     if(data){
       const i=S.equipos.findIndex(e=>e.id===eq.id);if(i>=0)S.equipos[i]=data;
       const j=(S.allEquipos||[]).findIndex(e=>e.id===eq.id);if(j>=0)S.allEquipos[j]=data;
@@ -499,9 +500,16 @@ function rEqDet(div,eq){
   nameCard.querySelector('#clearteam').onclick=async()=>{
     if(!confirm('¿Vaciar tu selección actual (los 15 jugadores, pateador y capitán en vivo)? Las fechas que ya guardaste con "Guardar equipo" no se van a ver afectadas. Esta acción no se puede deshacer.'))return;
     const btn=nameCard.querySelector('#clearteam');btn.disabled=true;btn.textContent='Vaciando...';
+    const prevSlots=eq.slots,prevKicker=eq.kicker,prevCapitan=eq.capitan;
     eq.slots=[];eq.kicker=null;eq.capitan=null;
-    await upsertEq(eq);
-    r();
+    try{
+      await upsertEq(eq);
+      r();
+    }catch(err){
+      eq.slots=prevSlots;eq.kicker=prevKicker;eq.capitan=prevCapitan;
+      btn.disabled=false;btn.textContent='Vaciar selección actual';
+      alert('No se pudo vaciar el equipo: '+(err?.message||'error desconocido'));
+    }
   };
   const bd=document.createElement('div');bd.className='card';bd.style.marginBottom='.5rem';
   const selFecha=S.miEqFecha||getRoundStatus().fecha;
