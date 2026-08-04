@@ -165,7 +165,7 @@ function cpf(j,isK,f){
   if(gb(j,f))p+=PC.bon;
   return p;
 }
-function cpt(j,isK){returnALL_FECHAS.reduce((s,f)=>s+cpf(j,isK,f),0);}
+function cpt(j,isK){return ALL_FECHAS.reduce((s,f)=>s+cpf(j,isK,f),0);}
 function slotPts(eq,slot,f){
   const j=JL.find(x=>x.id===slot.jid);if(!j)return 0;
   const base=f?cpf(j,eq.kicker===slot.jid,f):cpt(j,eq.kicker===slot.jid);
