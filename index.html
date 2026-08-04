@@ -986,6 +986,14 @@ function rRendimiento(div){
   div.appendChild(ftabs);
   const f=S.rendFecha||getRoundStatus().fecha;
 
+  const hasStats=FD[f]&&Object.keys(FD[f].stats||{}).length>0;
+  if(!hasStats){
+    const w=document.createElement('div');w.className='warn';
+    w.textContent=`Todavía no hay estadísticas cargadas de la Fecha ${f}. Esta vista se completa después de jugarse el partido.`;
+    div.appendChild(w);
+    return;
+  }
+
   // Mi equipo (lista)
   const myTeam=mainTeam(S.equipos);
   const h1=document.createElement('div');h1.className='st';h1.style.marginTop='.5rem';h1.textContent='Mi equipo';div.appendChild(h1);
