@@ -769,7 +769,7 @@ function renderModal(root){
       const teamsPlayingNow=ROUND_TEAMS[curFechaForPick];
       let jj=JL.filter(j=>{
         if(!j.nombre.toLowerCase().includes(q.toLowerCase())&&!j.equipo.toLowerCase().includes(q.toLowerCase()))return false;
-        if(S.modalPosFilter==='exact')return j.puesto===pn;
+        if(S.modalPosFilter==='exact'){const grp=POS_GROUPS.find(g=>g.pos.includes(pn));return grp?grp.pos.includes(j.puesto):j.puesto===pn;}
         if(S.modalPosFilter==='del')return j.puesto>=1&&j.puesto<=8;
         if(S.modalPosFilter==='bk')return j.puesto>=9&&j.puesto<=15;
         if(S.modalPosFilter==='f6')return !!gs(j,6).titular||!!gs(j,6).suplente;
@@ -839,6 +839,13 @@ function groupForPuesto(p){
 function rJugStats(div){
   div.innerHTML='<div class="st">Jugadores</div><p class="ht">Estadísticas de todos los jugadores, agrupadas por puesto. Popularidad = % de usuarios que lo tienen en su equipo hoy. Forma = suma de sus últimas 3 fechas jugadas.</p>';
   const inp=document.createElement('input');inp.placeholder='Buscar por nombre o equipo...';inp.style.marginBottom='.5rem';
+  const POSF=[['all','Todos'],['pilar','Pilar'],['hooker','Hooker'],['2da','2da línea'],['3ra','3ra línea'],['medios','Medios'],['apertura','Aperturas'],['centros','Centros'],['backs','Backs']];
+  const POSF_MAP={pilar:[1,3],hooker:[2],'2da':[4,5],'3ra':[6,7,8],medios:[9],apertura:[10],centros:[12,13],backs:[11,14,15]};
+  const ptabs=document.createElement('div');ptabs.style.cssText='display:flex;gap:4px;margin-bottom:.5rem;flex-wrap:wrap';
+  POSF.forEach(([v,l])=>{
+    const b=document.createElement('button');b.className='pos-tab'+((S.jugPos||'all')===v?' active':'');
+    b.textContent=l;b.onclick=()=>{S.jugPos=v;fr(inp.value)};ptabs.appendChild(b);
+  });
   const stabs=document.createElement('div');stabs.style.cssText='display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap';
   [['acum','PV Acumulado'],['prom','PV Promedio'],['kick','Kicking'],['pop','Popularidad'],['form','Forma (últ. 3)'],['nombre','Nombre']].forEach(([v,l])=>{
     const b=document.createElement('button');b.className='sort-tab'+((S.jugSort||'acum')===v?' active':'');
@@ -848,6 +855,8 @@ function rJugStats(div){
   const fr=q=>{
     list.innerHTML='';
     let jj=JL.filter(j=>j.nombre.toLowerCase().includes(q.toLowerCase())||j.equipo.toLowerCase().includes(q.toLowerCase()));
+    const posFilter=S.jugPos||'all';
+    if(posFilter!=='all'){const allowed=POSF_MAP[posFilter];jj=jj.filter(j=>allowed.includes(j.puesto));}
     const sortMode=S.jugSort||'acum';
     const metric=j=>sortMode==='acum'?cpt(j,false):sortMode==='prom'?avgPtsG(j):sortMode==='kick'?kickingPtsG(j):sortMode==='pop'?popularityG(j):sortMode==='form'?formPtsG(j):0;
     if(sortMode==='nombre')jj.sort((a,b)=>a.nombre.localeCompare(b.nombre));
@@ -879,7 +888,7 @@ function rJugStats(div){
     });
   };
   inp.oninput=e=>fr(e.target.value);
-  div.appendChild(inp);div.appendChild(stabs);fr('');div.appendChild(list);
+  div.appendChild(inp);div.appendChild(ptabs);div.appendChild(stabs);fr('');div.appendChild(list);
 }
 
 function rRank(div){
@@ -977,8 +986,8 @@ function renderSquadAsList(container,sq,f){
 }
 
 function rRendimiento(div){
-  div.innerHTML='<div class="st">Rendimiento</div><p class="ht">Tu equipo, el mejor equipo de la fecha entre todos los usuarios, y el equipo ideal — todo en formato lista.</p>';
-  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  div.innerHTML='<div class="st">Rendimiento</div>';
+  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;overflow-x:auto';
   ALL_FECHAS.forEach(f=>{
     const b=document.createElement('button');b.className='ftab'+((S.rendFecha||getRoundStatus().fecha)===f?' active':'');
     b.textContent=`F${f} · ${FDATES[f]}`;b.onclick=()=>{S.rendFecha=f;r()};ftabs.appendChild(b);
@@ -994,49 +1003,93 @@ function rRendimiento(div){
     return;
   }
 
-  // Mi equipo (lista)
   const myTeam=mainTeam(S.equipos);
-  const h1=document.createElement('div');h1.className='st';h1.style.marginTop='.5rem';h1.textContent='Mi equipo';div.appendChild(h1);
-  if(myTeam){
-    const card=document.createElement('div');card.className='card';
-    const mySq=squadForFecha(myTeam,f);
-    const myTotal=renderSquadAsList(card,mySq,f);
-    div.appendChild(card);
-    const tot=document.createElement('div');tot.style.cssText='text-align:right;margin:-.5rem 0 1rem';
-    tot.innerHTML=`<span class="badge bg" style="font-size:14px;padding:3px 12px">${myTotal} pts</span>`;
-    div.appendChild(tot);
-  }
-
-  // Mejor equipo de la fecha
   const usuarios=groupByUser(S.allEquipos).filter(u=>u.team);
+  const myPts=myTeam?ceqf(myTeam,f):0;
+  const communityAvg=usuarios.length?Math.round(usuarios.reduce((s,u)=>s+ceqf(u.team,f),0)/usuarios.length):0;
   let best=null,bestPts=-1;
-  usuarios.forEach(u=>{
-    const p=ceqf(u.team,f);
-    if(p>bestPts){bestPts=p;best=u;}
-  });
-  if(best){
-    const h2=document.createElement('div');h2.className='st';h2.style.marginTop='1.5rem';h2.textContent='Mejor equipo de la fecha';div.appendChild(h2);
-    const bc=document.createElement('div');bc.className='card';
-    const isMe=best.uid===S.session.user.id;
-    bc.innerHTML=`<div class="flex-sb"><div><div style="font-size:14px;font-weight:500">${isMe?'Vos · ':''}${best.team.apodo||best.email||'Jugador'}</div><div style="font-size:11px;color:var(--text-secondary)">${best.team.nombre}</div></div><span class="badge bg" style="font-size:15px;padding:4px 12px">${bestPts} pts</span></div>`;
-    const vb=document.createElement('button');vb.textContent='Ver equipo';vb.style.marginTop='.5rem';
-    vb.onclick=()=>{S.modal={type:'teamview',squad:squadForFecha(best.team,f),fecha:f,label:(best.team.apodo||best.email||'Jugador')};r()};
-    bc.appendChild(vb);
-    div.appendChild(bc);
-  }
-
-  // Equipo ideal (lista)
-  const h3=document.createElement('div');h3.className='st';h3.style.marginTop='1.5rem';h3.textContent='Equipo ideal de la fecha';div.appendChild(h3);
-  const idealCard=document.createElement('div');idealCard.className='card';
+  usuarios.forEach(u=>{const p=ceqf(u.team,f);if(p>bestPts){bestPts=p;best=u;}});
   const ideal=buildIdealTeam(f);
-  const idealTotal=renderSquadAsList(idealCard,{slots:ideal.slots,kicker:ideal.kicker,capitan:ideal.capitan},f);
-  div.appendChild(idealCard);
-  const idealTot=document.createElement('div');idealTot.style.cssText='text-align:right;margin:-.5rem 0 1.5rem';
-  idealTot.innerHTML=`<span class="badge bg" style="font-size:14px;padding:3px 12px">${idealTotal} pts</span>`;
-  div.appendChild(idealTot);
+  const idealPts=ceqf(ideal,f);
 
-  // Gráfico de puestos
-  const h4=document.createElement('div');h4.className='st';h4.textContent='Puestos más performantes';div.appendChild(h4);
+  // Resumen de la fecha
+  const summary=document.createElement('div');summary.className='card';
+  summary.innerHTML=`<div class="fgrid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="fcell"><div class="lbl">Tus puntos</div><b>${myPts}</b></div>
+    <div class="fcell"><div class="lbl">Promedio comunidad</div><b>${communityAvg}</b></div>
+    <div class="fcell"><div class="lbl">Mejor de la comunidad</div><b>${bestPts<0?0:bestPts}</b></div>
+    <div class="fcell"><div class="lbl">Mejor teórico</div><b>${idealPts}</b></div>
+  </div>`;
+  div.appendChild(summary);
+
+  // Subpestañas
+  const subtabs=document.createElement('div');subtabs.style.cssText='display:flex;gap:6px;margin:1rem 0;flex-wrap:wrap';
+  const subOpts=[['tuequipo','Tu equipo'],['top20','Top 20'],['fecha','Equipo de la fecha'],['pop','Más elegidos']];
+  subOpts.forEach(([v,l])=>{
+    const b=document.createElement('button');b.className='ftab'+((S.rendSub||'tuequipo')===v?' active':'');
+    b.textContent=l;b.onclick=()=>{S.rendSub=v;r()};subtabs.appendChild(b);
+  });
+  div.appendChild(subtabs);
+
+  const sub=S.rendSub||'tuequipo';
+  const content=document.createElement('div');
+
+  if(sub==='tuequipo'){
+    if(myTeam){
+      const card=document.createElement('div');card.className='card';
+      const mySq=squadForFecha(myTeam,f);
+      renderSquadAsList(card,mySq,f);
+      content.appendChild(card);
+    } else {
+      content.innerHTML='<div class="card"><p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">Todavía no armaste tu equipo.</p></div>';
+    }
+  } else if(sub==='top20'){
+    const sorted=[...JL].map(j=>({j,pts:cpf(j,false,f)})).filter(x=>x.pts>0).sort((a,b)=>b.pts-a.pts).slice(0,20);
+    const card=document.createElement('div');card.className='card';
+    sorted.forEach(({j,pts},i)=>{
+      const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';
+      row.innerHTML=`<span style="font-size:11px;color:var(--text-secondary);min-width:20px">${i+1}.</span>
+        <span style="flex:1;font-size:13px;font-weight:500">${j.nombre} <span style="font-size:11px;color:var(--text-secondary)">${j.equipo}</span></span>
+        <span class="badge bb">${pts} pts</span>`;
+      row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+      card.appendChild(row);
+    });
+    content.appendChild(card);
+  } else if(sub==='fecha'){
+    const p=document.createElement('p');p.className='ht';p.textContent='La mejor combinación posible esta fecha: mejor pateador, capitán por PV, y el resto por PV respetando el límite de 2 por equipo real.';
+    content.appendChild(p);
+    const card=document.createElement('div');card.className='card';
+    renderSquadAsList(card,{slots:ideal.slots,kicker:ideal.kicker,capitan:ideal.capitan},f);
+    content.appendChild(card);
+    if(best){
+      const h=document.createElement('div');h.className='st';h.style.marginTop='1.25rem';h.textContent='Mejor equipo real de la fecha';content.appendChild(h);
+      const bc=document.createElement('div');bc.className='card';
+      const isMe=best.uid===S.session.user.id;
+      bc.innerHTML=`<div class="flex-sb"><div><div style="font-size:14px;font-weight:500">${isMe?'Vos · ':''}${best.team.apodo||best.email||'Jugador'}</div><div style="font-size:11px;color:var(--text-secondary)">${best.team.nombre}</div></div><span class="badge bg" style="font-size:15px;padding:4px 12px">${bestPts} pts</span></div>`;
+      const vb=document.createElement('button');vb.textContent='Ver equipo';vb.style.marginTop='.5rem';
+      vb.onclick=()=>{S.modal={type:'teamview',squad:squadForFecha(best.team,f),fecha:f,label:(best.team.apodo||best.email||'Jugador')};r()};
+      bc.appendChild(vb);
+      content.appendChild(bc);
+    }
+  } else if(sub==='pop'){
+    const sorted=[...JL].map(j=>({j,pop:popularityG(j),pts:cpf(j,false,f)})).filter(x=>x.pop>0).sort((a,b)=>b.pop-a.pop).slice(0,20);
+    const card=document.createElement('div');card.className='card';
+    if(!sorted.length){card.innerHTML='<p style="font-size:13px;color:var(--text-secondary);text-align:center;padding:1rem">Todavía no hay equipos suficientes para calcular popularidad.</p>';}
+    sorted.forEach(({j,pop,pts},i)=>{
+      const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';
+      row.innerHTML=`<span style="font-size:11px;color:var(--text-secondary);min-width:20px">${i+1}.</span>
+        <span style="flex:1;font-size:13px;font-weight:500">${j.nombre} <span style="font-size:11px;color:var(--text-secondary)">${j.equipo}</span></span>
+        <span class="badge bt" style="margin-right:4px">${pop}%</span>
+        <span class="badge bb">${pts} pts</span>`;
+      row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+      card.appendChild(row);
+    });
+    content.appendChild(card);
+  }
+  div.appendChild(content);
+
+  // Gráfico de puestos (debajo de todo)
+  const h4=document.createElement('div');h4.className='st';h4.style.marginTop='1.5rem';h4.textContent='Puestos más performantes';div.appendChild(h4);
   const legend=document.createElement('div');legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem';
   POS_GROUPS.forEach(pg=>{
     const s=document.createElement('span');s.style.cssText=`font-size:11px;padding:3px 10px;border-radius:20px;background:${pg.color}22;color:${pg.color};border:1px solid ${pg.color}55`;
