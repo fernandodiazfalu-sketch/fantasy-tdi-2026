@@ -172,6 +172,9 @@ function isFechaClosed(f){
   return dl?new Date()>=dl:false;
 }
 function squadForFecha(eq,f){
+  if(eq.historial===undefined){
+    return{slots:eq.slots||[],kicker:eq.kicker,capitan:eq.capitan};
+  }
   if(eq.historial&&eq.historial[f])return eq.historial[f];
   if(isFechaClosed(f))return{slots:[],kicker:null,capitan:null};
   return{slots:eq.slots||[],kicker:eq.kicker,capitan:eq.capitan};
@@ -956,9 +959,14 @@ function rTop(div){
     b.textContent=l;b.onclick=()=>{S.topFecha=v;r()};ftabs.appendChild(b);
   });
   div.appendChild(ftabs);
-  if(S.topFecha==='6'){
-    const w=document.createElement('div');w.className='warn';w.textContent='La Fecha 6 todavía no se jugó — se muestra la alineación confirmada (titular/suplente), sin estadísticas de partido.';
-    div.appendChild(w);
+  if(S.topFecha!=='acum'){
+    const fnum=parseInt(S.topFecha);
+    const hasStats=FD[fnum]&&Object.keys(FD[fnum].stats||{}).length>0;
+    if(!hasStats){
+      const w=document.createElement('div');w.className='warn';
+      w.textContent=`La Fecha ${fnum} todavía no tiene estadísticas cargadas.`;
+      div.appendChild(w);
+    }
   }
   const bar=document.createElement('div');bar.className='ptsl';
   [['Titular','3'],['Suplente','1'],['Try','5'],['Drop','4'],['Bonus','2'],['Conv. kicker','2'],['Penal kicker','3'],['Conv. fallada (kicker)','−2'],['Amarilla','−5'],['Roja','−10']].forEach(([k,v])=>{
