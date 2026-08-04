@@ -441,7 +441,10 @@ function rEqDet(div,eq){
       <div><label>Nombre del equipo</label><input id="teamname" value="${eq.nombre.replace(/"/g,'&quot;')}" style="margin-bottom:0"></div>
     </div>
     <div class="flex-sb">
-      <button class="primary" id="savename">Guardar</button>
+      <div style="display:flex;gap:8px">
+        <button class="primary" id="savename">Guardar</button>
+        <button class="danger" id="clearteam">Vaciar equipo</button>
+      </div>
       <span class="badge bg" style="font-size:15px;padding:4px 14px;white-space:nowrap">${pts} pts</span>
     </div>`;
   div.appendChild(nameCard);
@@ -453,6 +456,13 @@ function rEqDet(div,eq){
     eq.nombre=val;eq.apodo=apodoVal||null;await upsertEq(eq);
     btn.disabled=false;btn.textContent='Guardado ✓';
     setTimeout(()=>{btn.textContent='Guardar'},1500);
+  };
+  nameCard.querySelector('#clearteam').onclick=async()=>{
+    if(!confirm('¿Vaciar todo el equipo? Se van a borrar los 15 jugadores, el pateador y el capitán. Esta acción no se puede deshacer.'))return;
+    const btn=nameCard.querySelector('#clearteam');btn.disabled=true;btn.textContent='Vaciando...';
+    eq.slots=[];eq.kicker=null;eq.capitan=null;
+    await upsertEq(eq);
+    r();
   };
   const bd=document.createElement('div');bd.className='card';bd.style.marginBottom='.5rem';
   const selFecha=S.miEqFecha||'acum';
