@@ -227,9 +227,13 @@ function buildIdealTeam(f){
     let targetPos=null;
     if(j.puesto>=1&&j.puesto<=15&&!slots[j.puesto])targetPos=j.puesto;
     else{
-      const isForward=j.puesto>=1&&j.puesto<=8;
-      const range=isForward?DEL:BCK;
-      targetPos=range.find(p=>!slots[p]);
+      const grp=POS_GROUPS.find(g=>g.pos.includes(j.puesto));
+      if(grp)targetPos=grp.pos.find(p=>!slots[p]);
+      if(targetPos===undefined||targetPos===null){
+        const isForward=j.puesto>=1&&j.puesto<=8;
+        const range=isForward?DEL:BCK;
+        targetPos=range.find(p=>!slots[p]);
+      }
       if(targetPos===undefined)targetPos=PS.find(p=>!slots[p]);
     }
     if(targetPos===undefined||targetPos===null)return false;
