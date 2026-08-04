@@ -1128,50 +1128,60 @@ function rRendimiento(div){
   div.appendChild(chart);
 }
 
+const FIXTURE={"8": [["Tucumán Rugby", "Duendes RC"], ["Jockey Rosario", "Estudiantes Paraná"], ["Tala RC", "Santa Fe Rugby"], ["Jockey Córdoba", "Marista RC"]], "7": [["GER", "La Tablada"], ["Urú Curé", "Universitario Cba."], ["Córdoba Athletic", "CURNE"], ["Old Resian", "Mendoza RC"]], "6": [["Marista RC", "GER"], ["Mendoza RC", "Tucumán Rugby"], ["CURNE", "Urú Curé"], ["Córdoba Athletic", "Santa Fe Rugby"], ["Jockey Rosario", "Universitario Cba."], ["Duendes RC", "Jockey Córdoba"], ["La Tablada", "Old Resian"]], "5": [["Tucumán Rugby", "Marista RC"], ["GER", "Mendoza RC"], ["Urú Curé", "Tala RC"], ["Estudiantes Paraná", "CURNE"], ["Santa Fe Rugby", "Jockey Rosario"], ["Universitario Cba.", "Córdoba Athletic"], ["Old Resian", "Duendes RC"], ["Jockey Córdoba", "La Tablada"]], "4": [["Tala RC", "CURNE"], ["GER", "Tucumán Rugby"], ["Marista RC", "Mendoza RC"], ["Estudiantes Paraná", "Urú Curé"], ["Jockey Rosario", "Córdoba Athletic"], ["Universitario Cba.", "Santa Fe Rugby"], ["Duendes RC", "La Tablada"], ["Jockey Córdoba", "Old Resian"]], "3": [["Old Resian", "Jockey Córdoba"], ["La Tablada", "Duendes RC"], ["Mendoza RC", "Marista RC"], ["Tucumán Rugby", "GER"], ["CURNE", "Tala RC"], ["Urú Curé", "Estudiantes Paraná"], ["Córdoba Athletic", "Jockey Rosario"], ["Santa Fe Rugby", "Universitario Cba."]], "2": [["Mendoza RC", "GER"], ["Marista RC", "Tucumán Rugby"], ["Tala RC", "Urú Curé"], ["CURNE", "Estudiantes Paraná"], ["Jockey Rosario", "Santa Fe Rugby"], ["Córdoba Athletic", "Universitario Cba."], ["Duendes RC", "Old Resian"], ["La Tablada", "Jockey Córdoba"]], "1": [["GER", "Marista RC"], ["Tucumán Rugby", "Mendoza RC"], ["Universitario Cba.", "Jockey Rosario"], ["Old Resian", "La Tablada"], ["Jockey Córdoba", "Duendes RC"], ["Urú Curé", "CURNE"], ["Santa Fe Rugby", "Córdoba Athletic"], ["Estudiantes Paraná", "Tala RC"]]};
 function rAlineaciones(div){
-  div.innerHTML='<div class="st">Alineaciones</div><p class="ht">Elegí un equipo del torneo y una fecha para ver su alineación confirmada, con los puntos virtuales de cada jugador.</p>';
-  const eqRow=document.createElement('div');eqRow.style.marginBottom='.75rem';
-  const sel=document.createElement('select');
-  ETDI.slice().sort((a,b)=>a.n.localeCompare(b.n)).forEach(e=>{
-    const o=document.createElement('option');o.value=e.n;o.textContent=e.n;
-    if((S.alinEquipo||ETDI[0].n)===e.n)o.selected=true;
-    sel.appendChild(o);
-  });
-  sel.onchange=e=>{S.alinEquipo=e.target.value;r()};
-  eqRow.appendChild(sel);div.appendChild(eqRow);
-
-  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  div.innerHTML='<div class="st">Alineaciones</div><p class="ht">Los enfrentamientos de cada fecha, con la alineación confirmada y los puntos de cada jugador.</p>';
+  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;overflow-x:auto';
   ALL_FECHAS.forEach(f=>{
     const b=document.createElement('button');b.className='ftab'+((S.alinFecha||getRoundStatus().fecha)===f?' active':'');
     b.textContent=`F${f} · ${FDATES[f]}`;b.onclick=()=>{S.alinFecha=f;r()};ftabs.appendChild(b);
   });
   div.appendChild(ftabs);
 
-  const equipo=S.alinEquipo||ETDI[0].n;
   const f=S.alinFecha||getRoundStatus().fecha;
-  const plantel=JL.filter(j=>j.equipo===equipo&&(gs(j,f).titular||gs(j,f).suplente));
-  if(!plantel.length){
+  const partidos=FIXTURE[String(f)]||[];
+  if(!partidos.length){
     const empty=document.createElement('div');empty.className='card';
-    empty.innerHTML=`<p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">No hay alineación confirmada de ${equipo} para la Fecha ${f} todavía.</p>`;
+    empty.innerHTML=`<p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">Todavía no hay fixture confirmado para la Fecha ${f}.</p>`;
     div.appendChild(empty);
     return;
   }
-  const titulares=plantel.filter(j=>gs(j,f).titular).sort((a,b)=>a.puesto-b.puesto);
-  const suplentes=plantel.filter(j=>gs(j,f).suplente).sort((a,b)=>a.puesto-b.puesto);
-  [['Titulares',titulares],['Suplentes',suplentes]].forEach(([label,arr])=>{
-    if(!arr.length)return;
-    const c=document.createElement('div');c.className='card';
-    c.innerHTML=`<div class="zh">${label}</div>`;
-    arr.forEach(j=>{
-      const pts=cpf(j,false,f),ptsK=cpf(j,true,f);
-      const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';
-      row.innerHTML=`<span style="font-size:11px;color:var(--text-secondary);min-width:24px">${j.puesto||'?'}</span>
-        <span style="flex:1;font-size:13px;font-weight:500">${j.nombre}</span>
-        <span class="badge bb" style="margin-right:4px">${pts}</span>${ptsK!==pts?`<span class="badge ba">${ptsK}kick</span>`:''}`;
-      row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
-      c.appendChild(row);
+
+  function renderTeamCol(equipo,f){
+    const wrap=document.createElement('div');wrap.style.cssText='flex:1;min-width:220px';
+    const titulares=JL.filter(j=>j.equipo===equipo&&gs(j,f).titular).sort((a,b)=>a.puesto-b.puesto);
+    const suplentes=JL.filter(j=>j.equipo===equipo&&gs(j,f).suplente).sort((a,b)=>a.puesto-b.puesto);
+    const h=document.createElement('div');h.style.cssText='font-size:13px;font-weight:600;margin-bottom:6px';h.textContent=equipo;
+    wrap.appendChild(h);
+    if(!titulares.length&&!suplentes.length){
+      const p=document.createElement('p');p.style.cssText='font-size:12px;color:var(--text-secondary)';p.textContent='Sin alineación confirmada.';
+      wrap.appendChild(p);
+      return wrap;
+    }
+    [['Forwards',titulares.filter(j=>j.puesto<=8)],['Backs',titulares.filter(j=>j.puesto>8)],['Bench',suplentes]].forEach(([label,arr])=>{
+      if(!arr.length)return;
+      const lbl=document.createElement('div');lbl.className='zh';lbl.style.margin='.5rem 0 2px';lbl.textContent=label;
+      wrap.appendChild(lbl);
+      arr.forEach(j=>{
+        const pts=cpf(j,false,f),ptsK=cpf(j,true,f);
+        const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';row.style.padding='4px 0';
+        row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:20px">${j.puesto||'?'}</span>
+          <span style="flex:1;font-size:12px;font-weight:500">${j.nombre}</span>
+          <span class="badge bb" style="font-size:10px;margin-right:3px">${pts}</span>${ptsK!==pts?`<span class="badge ba" style="font-size:10px">${ptsK}k</span>`:''}`;
+        row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+        wrap.appendChild(row);
+      });
     });
-    div.appendChild(c);
+    return wrap;
+  }
+
+  partidos.forEach(([local,visita])=>{
+    const card=document.createElement('div');card.className='card';
+    const row=document.createElement('div');row.style.cssText='display:flex;gap:1.5rem;flex-wrap:wrap';
+    row.appendChild(renderTeamCol(local,f));
+    row.appendChild(renderTeamCol(visita,f));
+    card.appendChild(row);
+    div.appendChild(card);
   });
 }
 
