@@ -223,19 +223,11 @@ function buildIdealTeam(f){
   let kicker=null,kickerVal=0;
   candidates.forEach(j=>{const s=gs(j,f);const val=(s.conversiones||0)*PC.conv+(s.penales||0)*PC.pen;if(val>kickerVal){kickerVal=val;kicker=j;}});
   const slots={};const teamCount={};
+  function groupOf(puesto){return POS_GROUPS.find(g=>g.pos.includes(puesto));}
   function tryAssign(j){
-    let targetPos=null;
-    if(j.puesto>=1&&j.puesto<=15&&!slots[j.puesto])targetPos=j.puesto;
-    else{
-      const grp=POS_GROUPS.find(g=>g.pos.includes(j.puesto));
-      if(grp)targetPos=grp.pos.find(p=>!slots[p]);
-      if(targetPos===undefined||targetPos===null){
-        const isForward=j.puesto>=1&&j.puesto<=8;
-        const range=isForward?DEL:BCK;
-        targetPos=range.find(p=>!slots[p]);
-      }
-      if(targetPos===undefined)targetPos=PS.find(p=>!slots[p]);
-    }
+    const grp=groupOf(j.puesto);
+    if(!grp)return false;
+    let targetPos=(j.puesto>=1&&j.puesto<=15&&!slots[j.puesto])?j.puesto:grp.pos.find(p=>!slots[p]);
     if(targetPos===undefined||targetPos===null)return false;
     if((teamCount[j.equipo]||0)>=MAX_POR_EQUIPO)return false;
     slots[targetPos]=j;teamCount[j.equipo]=(teamCount[j.equipo]||0)+1;
@@ -245,7 +237,12 @@ function buildIdealTeam(f){
   const rest1=candidates.filter(j=>j!==kicker).sort((a,b)=>cpf(b,false,f)-cpf(a,false,f));
   let capitan=rest1.length?rest1[0]:null;
   if(capitan)tryAssign(capitan);
-  rest1.filter(j=>j!==capitan).forEach(j=>{if(Object.keys(slots).length>=15)return;tryAssign(j);});
+  const rest=rest1.filter(j=>j!==capitan);
+  // Fill each real position line only with candidates from that same line
+  POS_GROUPS.forEach(grp=>{
+    rest.filter(j=>grp.pos.includes(j.puesto))
+        .forEach(j=>{if(grp.pos.every(p=>slots[p]))return;tryAssign(j);});
+  });
   const eqSlots=Object.keys(slots).map(pn=>({pos:parseInt(pn),jid:slots[pn].id}));
   return{nombre:'Equipo ideal',slots:eqSlots,kicker:kicker?kicker.id:null,capitan:capitan?capitan.id:null};
 }
