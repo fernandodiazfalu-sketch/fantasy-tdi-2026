@@ -166,22 +166,30 @@ function cpf(j,isK,f){
   return p;
 }
 function cpt(j,isK){return ALL_FECHAS.reduce((s,f)=>s+cpf(j,isK,f),0);}
+function squadForFecha(eq,f){
+  if(eq.historial&&eq.historial[f])return eq.historial[f];
+  return{slots:eq.slots||[],kicker:eq.kicker,capitan:eq.capitan};
+}
+function slotPtsRaw(sq,slot,f){
+  const j=JL.find(x=>x.id===slot.jid);if(!j)return 0;
+  const base=cpf(j,sq.kicker===slot.jid,f);
+  return sq.capitan===slot.jid?base*2:base;
+}
 function slotPts(eq,slot,f){
+  // used by live-editing views (Mis equipos current selection preview)
   const j=JL.find(x=>x.id===slot.jid);if(!j)return 0;
   const base=f?cpf(j,eq.kicker===slot.jid,f):cpt(j,eq.kicker===slot.jid);
   return eq.capitan===slot.jid?base*2:base;
 }
-function ceq(eq){
-  return(eq.slots||[]).reduce((s,slot)=>{
+function ceqf(eq,f){
+  const sq=squadForFecha(eq,f);
+  return(sq.slots||[]).reduce((s,slot)=>{
     if(!slot?.jid)return s;
-    return s+slotPts(eq,slot);
+    return s+slotPtsRaw(sq,slot,f);
   },0);
 }
-function ceqf(eq,f){
-  return(eq.slots||[]).reduce((s,slot)=>{
-    if(!slot?.jid)return s;
-    return s+slotPts(eq,slot,f);
-  },0);
+function ceq(eq){
+  return ALL_FECHAS.reduce((s,f)=>s+ceqf(eq,f),0);
 }
 const POS_GROUPS=[
   {name:'Pilares/Hooker',pos:[1,2,3],color:'#f87171'},
@@ -264,7 +272,7 @@ async function upsertEq(eq){
     return eq;
   }
   if(eq.id){
-    const{data}=await sb.from('equipos').update({nombre:eq.nombre,slots:eq.slots,kicker:eq.kicker,capitan:eq.capitan||null,apodo:eq.apodo||null}).eq('id',eq.id).select().single();
+    const{data}=await sb.from('equipos').update({nombre:eq.nombre,slots:eq.slots,kicker:eq.kicker,capitan:eq.capitan||null,apodo:eq.apodo||null,historial:eq.historial||{}}).eq('id',eq.id).select().single();
     if(data){
       const i=S.equipos.findIndex(e=>e.id===eq.id);if(i>=0)S.equipos[i]=data;
       const j=(S.allEquipos||[]).findIndex(e=>e.id===eq.id);if(j>=0)S.allEquipos[j]=data;
@@ -434,16 +442,21 @@ function rMisEq(div){
 
 function rEqDet(div,eq){
   const pts=ceq(eq);
+  const status=getRoundStatus();
+  const curFecha=status.fecha;
+  const hasSnapshotNow=!!(eq.historial&&eq.historial[curFecha]);
   const nameCard=document.createElement('div');nameCard.className='card';nameCard.style.marginBottom='.5rem';
   nameCard.innerHTML=`
     <div class="login-row" style="margin-bottom:.5rem">
       <div><label>Tu nombre (aparece en el ranking)</label><input id="apodo" value="${(eq.apodo||'').replace(/"/g,'&quot;')}" placeholder="Ej: Fernando D." style="margin-bottom:0"></div>
       <div><label>Nombre del equipo</label><input id="teamname" value="${eq.nombre.replace(/"/g,'&quot;')}" style="margin-bottom:0"></div>
     </div>
-    <div class="flex-sb">
-      <div style="display:flex;gap:8px">
-        <button class="primary" id="savename">Guardar</button>
-        <button class="danger" id="clearteam">Vaciar equipo</button>
+    <div class="warn" style="margin-bottom:.6rem">${hasSnapshotNow?`Ya guardaste tu equipo para la Fecha ${curFecha}. Podés seguir ajustándolo y volver a guardar antes de que cierre.`:`Tu selección todavía no está guardada para la Fecha ${curFecha}. Tocá "Guardar equipo" antes de que cierre, o no va a sumar puntos esa fecha.`}</div>
+    <div class="flex-sb" style="flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="primary" id="savename">Guardar nombre</button>
+        <button class="primary" id="saveteam" style="background:var(--fill-accent);border-color:transparent">Guardar equipo (Fecha ${curFecha})</button>
+        <button class="danger" id="clearteam">Vaciar selección actual</button>
       </div>
       <span class="badge bg" style="font-size:15px;padding:4px 14px;white-space:nowrap">${pts} pts</span>
     </div>`;
@@ -455,10 +468,24 @@ function rEqDet(div,eq){
     const btn=nameCard.querySelector('#savename');btn.disabled=true;btn.textContent='Guardando...';
     eq.nombre=val;eq.apodo=apodoVal||null;await upsertEq(eq);
     btn.disabled=false;btn.textContent='Guardado ✓';
-    setTimeout(()=>{btn.textContent='Guardar'},1500);
+    setTimeout(()=>{btn.textContent='Guardar nombre'},1500);
+  };
+  nameCard.querySelector('#saveteam').onclick=async()=>{
+    const btn=nameCard.querySelector('#saveteam');btn.disabled=true;btn.textContent='Guardando...';
+    const snapshot={slots:JSON.parse(JSON.stringify(eq.slots||[])),kicker:eq.kicker,capitan:eq.capitan};
+    eq.historial=eq.historial||{};
+    eq.historial[curFecha]=snapshot;
+    // protege retroactivamente cualquier fecha ya cerrada que todavía no tenga foto propia
+    ALL_FECHAS.forEach(f=>{
+      const dl=new Date(FECHA_DEADLINES[f]);
+      if(dl<new Date()&&!eq.historial[f])eq.historial[f]=snapshot;
+    });
+    await upsertEq(eq);
+    btn.disabled=false;btn.textContent='Guardado ✓';
+    setTimeout(()=>r(),700);
   };
   nameCard.querySelector('#clearteam').onclick=async()=>{
-    if(!confirm('¿Vaciar todo el equipo? Se van a borrar los 15 jugadores, el pateador y el capitán. Esta acción no se puede deshacer.'))return;
+    if(!confirm('¿Vaciar tu selección actual (los 15 jugadores, pateador y capitán en vivo)? Las fechas que ya guardaste con "Guardar equipo" no se van a ver afectadas. Esta acción no se puede deshacer.'))return;
     const btn=nameCard.querySelector('#clearteam');btn.disabled=true;btn.textContent='Vaciando...';
     eq.slots=[];eq.kicker=null;eq.capitan=null;
     await upsertEq(eq);
@@ -494,21 +521,34 @@ function rEqDet(div,eq){
   const tf=document.createElement('div');tf.className='tf field-formation';
   const FORMATION_ROWS=[[1,2,3],[4,5],[6,8,7],[9,10],[12,13],[11,15,14]];
   const fechaArg=selFecha==='acum'?undefined:selFecha;
+  const viewingSaved=fechaArg&&eq.historial&&eq.historial[fechaArg];
+  const viewSquad=viewingSaved?eq.historial[fechaArg]:{slots:eq.slots||[],kicker:eq.kicker,capitan:eq.capitan};
+  if(viewingSaved){
+    const note=document.createElement('p');note.className='ht';note.style.marginTop='-.25rem';
+    note.textContent=`Mostrando el equipo que guardaste para la Fecha ${fechaArg}. Los cambios que hagas ahora afectan tu selección en vivo, no esta foto.`;
+    tf.appendChild(note);
+  }
   FORMATION_ROWS.forEach(row=>{
     const rowEl=document.createElement('div');rowEl.className='formation-row';
     row.forEach(pn=>{
-      const slot=(eq.slots||[]).find(s=>s?.pos===pn);
+      const slot=(viewSquad.slots||[]).find(s=>s?.pos===pn);
       const j=slot?JL.find(x=>x.id===slot.jid):null;
-      const isK=!!j&&eq.kicker===j.id;
-      const isC=!!j&&eq.capitan===j.id;
+      const isK=!!j&&viewSquad.kicker===j.id;
+      const isC=!!j&&viewSquad.capitan===j.id;
       const card=document.createElement('div');card.className='pos-card'+(j?' filled':'');
+      const ptsShown=j?(fechaArg?slotPtsRaw(viewSquad,slot,fechaArg):slotPts(eq,slot)):0;
       card.innerHTML=j?
         `<span class="jersey">${pn}</span><span class="poslabel">${PN[pn]}</span>
          <span class="pname">${j.nombre.split(',')[0]}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''}</span>
          <span class="ppts">${j.equipo}</span>
-         <span class="badge bg" style="margin-top:2px">${slotPts(eq,slot,fechaArg)} pts</span>`
+         <span class="badge bg" style="margin-top:2px">${ptsShown} pts</span>`
         :`<span class="jersey" style="background:linear-gradient(160deg,#2e5c3c,#16321f)">${pn}</span><span class="poslabel">${PN[pn]}</span><span class="pname" style="color:var(--text-secondary);font-weight:400">+ Agregar</span>`;
-      card.onclick=()=>{S.modal={type:'player',eqId:eq.id,posNum:pn};S.modalSearch='';S.modalPosFilter='all';S.modalSort='pts';r()};
+      if(!viewingSaved){
+        card.onclick=()=>{S.modal={type:'player',eqId:eq.id,posNum:pn};S.modalSearch='';S.modalPosFilter='all';S.modalSort='pts';r()};
+      } else {
+        card.style.cursor=j?'pointer':'default';
+        if(j)card.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+      }
       rowEl.appendChild(card);
     });
     tf.appendChild(rowEl);
