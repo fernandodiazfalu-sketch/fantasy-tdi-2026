@@ -920,7 +920,9 @@ function rRank(div){
   ].sort((a,b)=>(viewFecha?ceqf(b,viewFecha):ceq(b))-(viewFecha?ceqf(a,viewFecha):ceq(a)));
 
   if(!todos.length){
-    div.innerHTML+='<div class="card"><p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">Creá un equipo y agregá amigos para ver el ranking.</p></div>';
+    const empty=document.createElement('div');empty.className='card';
+    empty.innerHTML='<p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">Creá un equipo y agregá amigos para ver el ranking.</p>';
+    div.appendChild(empty);
   } else {
     const card=document.createElement('div');card.className='card';
     const medals=['1°','2°','3°'];
@@ -1149,7 +1151,9 @@ function rAlineaciones(div){
   const f=S.alinFecha||getRoundStatus().fecha;
   const plantel=JL.filter(j=>j.equipo===equipo&&(gs(j,f).titular||gs(j,f).suplente));
   if(!plantel.length){
-    div.innerHTML+=`<div class="card"><p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">No hay alineación confirmada de ${equipo} para la Fecha ${f} todavía.</p></div>`;
+    const empty=document.createElement('div');empty.className='card';
+    empty.innerHTML=`<p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">No hay alineación confirmada de ${equipo} para la Fecha ${f} todavía.</p>`;
+    div.appendChild(empty);
     return;
   }
   const titulares=plantel.filter(j=>gs(j,f).titular).sort((a,b)=>a.puesto-b.puesto);
