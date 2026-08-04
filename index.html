@@ -485,11 +485,6 @@ function rEqDet(div,eq){
     const snapshot={slots:JSON.parse(JSON.stringify(eq.slots||[])),kicker:eq.kicker,capitan:eq.capitan};
     eq.historial=eq.historial||{};
     eq.historial[curFecha]=snapshot;
-    // protege retroactivamente cualquier fecha ya cerrada que todavía no tenga foto propia
-    ALL_FECHAS.forEach(f=>{
-      const dl=new Date(FECHA_DEADLINES[f]);
-      if(dl<new Date()&&!eq.historial[f])eq.historial[f]=snapshot;
-    });
     await upsertEq(eq);
     btn.disabled=false;btn.textContent='Guardado ✓';
     setTimeout(()=>r(),700);
