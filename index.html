@@ -260,7 +260,7 @@ let S={
   loading:true,session:null,tab:'mis-equipos',equipos:[],amigos:[],
   modal:null,verEqId:null,
   authMode:'login',authEmail:'',authPass:'',authMsg:null,authLoading:false,
-  modalSearch:'',modalPosFilter:'all',modalSort:'pts',topFecha:'acum',idealFecha:6,puestosFecha:6,miEqFecha:'acum'
+  modalSearch:'',modalPosFilter:'all',modalSort:'pts',topFecha:'acum',idealFecha:6,puestosFecha:6,miEqFecha:null,rendFecha:null,alinFecha:null,alinEquipo:null,rankVerFecha:null
 };
 
 async function loadData(){
@@ -345,7 +345,7 @@ function renderApp(root){
   root.appendChild(banner);
 
   const tb=document.createElement('div');tb.className='tabs';
-  [['mis-equipos','Mis equipos'],['jugadores','Jugadores'],['ranking','Ranking'],['top','Top jugadores'],['ideal','Equipo ideal'],['puestos','Puestos']].forEach(([t,l])=>{
+  [['mis-equipos','Mi equipo'],['ranking','Clasificación'],['rendimiento','Rendimiento'],['jugadores','Jugadores'],['alineaciones','Alineaciones']].forEach(([t,l])=>{
     const b=document.createElement('button');b.className='tab'+(S.tab===t?' active':'');
     b.textContent=l;b.onclick=()=>{S.tab=t;S.verEqId=null;r()};tb.appendChild(b);
   });
@@ -353,11 +353,10 @@ function renderApp(root){
 
   const c=document.createElement('div');
   if(S.tab==='mis-equipos')rMisEq(c);
-  else if(S.tab==='jugadores')rJug(c);
+  else if(S.tab==='jugadores')rJugStats(c);
   else if(S.tab==='ranking')rRank(c);
-  else if(S.tab==='top')rTop(c);
-  else if(S.tab==='ideal')rIdeal(c);
-  else if(S.tab==='puestos')rPuestos(c);
+  else if(S.tab==='rendimiento')rRendimiento(c);
+  else if(S.tab==='alineaciones')rAlineaciones(c);
   root.appendChild(c);
 }
 
@@ -501,7 +500,7 @@ function rEqDet(div,eq){
     r();
   };
   const bd=document.createElement('div');bd.className='card';bd.style.marginBottom='.5rem';
-  const selFecha=S.miEqFecha||'acum';
+  const selFecha=S.miEqFecha||getRoundStatus().fecha;
   bd.innerHTML='<div class="fgrid">'+
     `<div class="fcell" data-f="acum" style="cursor:pointer;${selFecha==='acum'?'border-color:var(--border-accent);background:var(--border-accent)22':''}"><div class="lbl">Total</div><b>${ceq(eq)}</b></div>`+
     ALL_FECHAS.map(f=>`<div class="fcell" data-f="${f}" style="cursor:pointer;${selFecha==f?'border-color:var(--border-accent);background:var(--border-accent)22':''}"><div class="lbl">F${f}</div><b>${ceqf(eq,f)}</b></div>`).join('')+'</div>';
@@ -574,6 +573,38 @@ function renderModal(root){
   const bg=document.createElement('div');bg.className='modal-bg';
   const modal=document.createElement('div');modal.className='modal';
   const m=S.modal;
+
+  if(m.type==='teamview'){
+    const sq=m.squad;
+    modal.innerHTML=`<div style="font-size:16px;font-weight:600;margin-bottom:.15rem">${m.label}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:1rem">Fecha ${m.fecha} · ${FDATES[m.fecha]}</div>`;
+    const list=document.createElement('div');
+    let total=0;
+    PS.forEach(pn=>{
+      const slot=(sq.slots||[]).find(s=>s?.pos===pn);
+      const j=slot?JL.find(x=>x.id===slot.jid):null;
+      const row=document.createElement('div');row.className='prow';
+      if(j){
+        const isK=sq.kicker===j.id,isC=sq.capitan===j.id;
+        const pts=slotPtsRaw(sq,slot,m.fecha);total+=pts;
+        row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span>
+          <span style="flex:1;font-size:13px;font-weight:500">${j.nombre}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''} <span style="font-size:11px;color:var(--text-secondary)">${j.equipo}</span></span>
+          <span class="badge bb">${pts} pts</span>`;
+      } else {
+        row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span><span style="flex:1;font-size:13px;color:var(--text-secondary)">— vacío —</span>`;
+      }
+      list.appendChild(row);
+    });
+    modal.appendChild(list);
+    const totalRow=document.createElement('div');
+    totalRow.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border-strong)';
+    totalRow.innerHTML=`<b style="font-size:14px">Total esa fecha</b><span class="badge bg" style="font-size:15px;padding:4px 12px">${total} pts</span>`;
+    modal.appendChild(totalRow);
+    const cl=document.createElement('button');cl.textContent='Cerrar';cl.style.marginTop='1rem';
+    cl.onclick=()=>{S.modal=null;r()};modal.appendChild(cl);
+    bg.appendChild(modal);bg.onclick=e=>{if(e.target===bg){S.modal=null;r()}};root.appendChild(bg);
+    return;
+  }
 
   if(m.type==='playerinfo'){
     const j=JL.find(x=>x.id===m.jid);
@@ -777,70 +808,121 @@ function renderModal(root){
   bg.appendChild(modal);bg.onclick=e=>{if(e.target===bg){S.modal=null;r()}};root.appendChild(bg);
 }
 
-function rJug(div){
-  div.innerHTML='<div class="st">Jugadores</div><p class="ht">Jugadores del TDI A · Fechas 1-6. La Fecha 6 aún no jugó: solo se muestra su alineación (titular/suplente).</p>';
-  const inp=document.createElement('input');inp.placeholder='Buscar por nombre o equipo...';inp.style.marginBottom='.75rem';
+function avgPtsG(j){
+  const played=ALL_FECHAS.filter(f=>{const s=gs(j,f);return s.titular||s.suplente}).length;
+  return played?(cpt(j,false)/played):0;
+}
+function kickingPtsG(j){return cpt(j,true)-cpt(j,false);}
+function formPtsG(j){
+  const played=ALL_FECHAS.filter(f=>{const s=gs(j,f);return s.titular||s.suplente});
+  return played.slice(-3).reduce((s,f)=>s+cpf(j,false,f),0);
+}
+function popularityG(j){
+  const users=groupByUser(S.allEquipos).filter(u=>u.team);
+  if(!users.length)return 0;
+  const count=users.filter(u=>(u.team.slots||[]).some(s=>s?.jid===j.id)).length;
+  return Math.round(100*count/users.length);
+}
+function groupForPuesto(p){
+  const g=POS_GROUPS.find(x=>x.pos.includes(p));
+  return g?g.name:'Otros';
+}
+function rJugStats(div){
+  div.innerHTML='<div class="st">Jugadores</div><p class="ht">Estadísticas de todos los jugadores, agrupadas por puesto. Popularidad = % de usuarios que lo tienen en su equipo hoy. Forma = suma de sus últimas 3 fechas jugadas.</p>';
+  const inp=document.createElement('input');inp.placeholder='Buscar por nombre o equipo...';inp.style.marginBottom='.5rem';
+  const stabs=document.createElement('div');stabs.style.cssText='display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap';
+  [['acum','PV Acumulado'],['prom','PV Promedio'],['kick','Kicking'],['pop','Popularidad'],['form','Forma (últ. 3)'],['nombre','Nombre']].forEach(([v,l])=>{
+    const b=document.createElement('button');b.className='sort-tab'+((S.jugSort||'acum')===v?' active':'');
+    b.textContent=l;b.onclick=()=>{S.jugSort=v;fr(inp.value)};stabs.appendChild(b);
+  });
   const list=document.createElement('div');
   const fr=q=>{
     list.innerHTML='';
-    const jj=JL.filter(j=>j.nombre.toLowerCase().includes(q.toLowerCase())||j.equipo.toLowerCase().includes(q.toLowerCase()));
-    const byEq={};jj.forEach(j=>{if(!byEq[j.equipo])byEq[j.equipo]=[];byEq[j.equipo].push(j)});
-    if(!Object.keys(byEq).length){list.innerHTML='<p style="font-size:13px;color:var(--text-secondary)">Sin resultados.</p>';return;}
-    Object.keys(byEq).sort().forEach(eq=>{
+    let jj=JL.filter(j=>j.nombre.toLowerCase().includes(q.toLowerCase())||j.equipo.toLowerCase().includes(q.toLowerCase()));
+    const sortMode=S.jugSort||'acum';
+    const metric=j=>sortMode==='acum'?cpt(j,false):sortMode==='prom'?avgPtsG(j):sortMode==='kick'?kickingPtsG(j):sortMode==='pop'?popularityG(j):sortMode==='form'?formPtsG(j):0;
+    if(sortMode==='nombre')jj.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    else jj.sort((a,b)=>metric(b)-metric(a));
+    const byGroup={};
+    jj.forEach(j=>{const g=groupForPuesto(j.puesto);(byGroup[g]=byGroup[g]||[]).push(j)});
+    const order=[...POS_GROUPS.map(g=>g.name),'Otros'];
+    if(!jj.length){list.innerHTML='<p style="font-size:13px;color:var(--text-secondary)">Sin resultados.</p>';return;}
+    order.forEach(gname=>{
+      const arr=byGroup[gname];if(!arr||!arr.length)return;
       const c=document.createElement('div');c.className='card';
-      const eqO=ETDI.find(e=>e.n===eq);
-      c.innerHTML=`<div class="zh">Zona ${eqO?eqO.z:'?'} · ${eq}</div>`;
-      byEq[eq].sort((a,b)=>a.puesto-b.puesto).forEach(j=>{
-        const pts=cpt(j,false),ptsK=cpt(j,true);
-        const hasTit=[1,2,3,4,5].some(f=>gs(j,f).titular);
-        const hasSup=[1,2,3,4,5].some(f=>gs(j,f).suplente);
+      c.innerHTML=`<div class="zh">${gname}</div>`;
+      arr.forEach(j=>{
+        const hasTit=ALL_FECHAS.some(f=>gs(j,f).titular);
+        const hasSup=ALL_FECHAS.some(f=>gs(j,f).suplente);
         const tit=hasTit?'<span class="badge bt" style="font-size:9px">T</span>':hasSup?'<span class="badge bg2" style="font-size:9px">S</span>':'';
-        const s6=gs(j,6);
-        const f6b=s6.titular?'<span class="badge ba" style="font-size:9px">Titular F6</span>':s6.suplente?'<span class="badge bg2" style="font-size:9px">Suplente F6</span>':'';
+        const acum=cpt(j,false),prom=avgPtsG(j),kick=kickingPtsG(j),pop=popularityG(j),form=formPtsG(j);
         const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';
-        row.innerHTML=`<span style="font-size:11px;color:var(--text-secondary);min-width:20px">${j.puesto||'?'}</span>
-          <span style="flex:1;font-size:13px;font-weight:500">${j.nombre} ${tit} ${f6b}</span>
-          <span class="badge bb" style="margin-right:4px">${pts}</span>${ptsK!==pts?`<span class="badge ba">${ptsK}kick</span>`:''}`;
+        row.innerHTML=`<span style="flex:1;font-size:13px;font-weight:500">${j.nombre} ${tit}<br><span style="font-size:11px;color:var(--text-secondary);font-weight:400">${j.equipo}</span></span>
+          <span class="badge bb" style="margin-right:4px" title="PV Acumulado">${acum}</span>
+          <span class="badge bg2" style="margin-right:4px" title="PV Promedio">${prom.toFixed(1)}</span>
+          ${kick!==0?`<span class="badge ba" style="margin-right:4px" title="Kicking">${kick}k</span>`:''}
+          <span class="badge bt" style="margin-right:4px" title="Popularidad">${pop}%</span>
+          <span class="badge bg" title="Forma últ. 3">${form}</span>`;
         row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
         c.appendChild(row);
       });
       list.appendChild(c);
     });
   };
-  inp.oninput=e=>fr(e.target.value);div.appendChild(inp);fr('');div.appendChild(list);
+  inp.oninput=e=>fr(e.target.value);
+  div.appendChild(inp);div.appendChild(stabs);fr('');div.appendChild(list);
 }
 
 function rRank(div){
   const h=document.createElement('div');h.className='flex-sb';h.style.marginBottom='1rem';
-  h.innerHTML='<div class="st" style="margin:0">Ranking</div>';
+  h.innerHTML='<div class="st" style="margin:0">Clasificación</div>';
   const ba=document.createElement('button');ba.className='primary';ba.textContent='+ Amigo';
   ba.onclick=()=>{S.modal={type:'newfriend'};r()};
   h.appendChild(ba);div.appendChild(h);
+
+  const closedFechas=ALL_FECHAS.filter(f=>isFechaClosed(f));
+  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  const totalBtn=document.createElement('button');totalBtn.className='ftab'+(!S.rankVerFecha?' active':'');
+  totalBtn.textContent='Total';totalBtn.onclick=()=>{S.rankVerFecha=null;r()};ftabs.appendChild(totalBtn);
+  closedFechas.forEach(f=>{
+    const b=document.createElement('button');b.className='ftab'+(S.rankVerFecha===f?' active':'');
+    b.textContent=`F${f}`;b.onclick=()=>{S.rankVerFecha=f;r()};ftabs.appendChild(b);
+  });
+  div.appendChild(ftabs);
+
+  const viewFecha=S.rankVerFecha;
   const usuarios=groupByUser(S.allEquipos);
   const todos=[
     ...usuarios.filter(u=>u.team).map(u=>({
       _lbl:(u.uid===S.session.user.id?'Yo · ':'')+(u.team.apodo||u.email||'Jugador')+' · '+u.team.nombre,
+      _isMine:u.uid===S.session.user.id,
       ...u.team
     })),
-    ...S.amigos.map(a=>({_lbl:a.nombre+' (invitado)',slots:a.equipo?.slots||[],kicker:a.equipo?.kicker||null,capitan:a.equipo?.capitan||null,nombre:a.nombre}))
-  ].sort((a,b)=>ceq(b)-ceq(a));
+    ...S.amigos.map(a=>({_lbl:a.nombre+' (invitado)',_isMine:false,slots:a.equipo?.slots||[],kicker:a.equipo?.kicker||null,capitan:a.equipo?.capitan||null,nombre:a.nombre}))
+  ].sort((a,b)=>(viewFecha?ceqf(b,viewFecha):ceq(b))-(viewFecha?ceqf(a,viewFecha):ceq(a)));
+
   if(!todos.length){
     div.innerHTML+='<div class="card"><p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">Creá un equipo y agregá amigos para ver el ranking.</p></div>';
   } else {
     const card=document.createElement('div');card.className='card';
+    const medals=['1°','2°','3°'];
     todos.forEach((eq,i)=>{
-      const pts=ceq(eq);
+      const pts=viewFecha?ceqf(eq,viewFecha):ceq(eq);
       const row=document.createElement('div');row.className='rrow';
-      const medals=['1°','2°','3°'];
       row.innerHTML=`<span style="font-size:14px;min-width:28px;color:var(--text-secondary)">${i<3?medals[i]:(i+1)+'°'}</span>
         <div style="flex:1"><div style="font-size:14px;font-weight:500">${eq._lbl}</div>
-        <div style="font-size:11px;color:var(--text-secondary)">${ALL_FECHAS.map(f=>`F${f}:${ceqf(eq,f)}`).join(' · ')}</div></div>
+        <div style="font-size:11px;color:var(--text-secondary)">${viewFecha?`Fecha ${viewFecha}`:ALL_FECHAS.map(f=>`F${f}:${ceqf(eq,f)}`).join(' · ')}</div></div>
         <span class="badge bg" style="font-size:14px;padding:3px 12px">${pts} pts</span>`;
+      if(viewFecha){
+        const vb=document.createElement('button');vb.textContent='Ver equipo';vb.style.marginLeft='8px';
+        vb.onclick=()=>{S.modal={type:'teamview',squad:squadForFecha(eq,viewFecha),fecha:viewFecha,label:eq._lbl};r()};
+        row.appendChild(vb);
+      }
       card.appendChild(row);
     });div.appendChild(card);
   }
-  if(S.amigos.length){
-    const h2=document.createElement('div');h2.className='st';h2.style.marginTop='1.25rem';h2.textContent='Equipos de amigos';div.appendChild(h2);
+  if(S.amigos.length&&!viewFecha){
+    const h2=document.createElement('div');h2.className='st';h2.style.marginTop='1.25rem';h2.textContent='Armar equipos de amigos';div.appendChild(h2);
     S.amigos.forEach((a)=>{
       const c=document.createElement('div');c.className='card';const pts=ceq(a.equipo||{});
       c.innerHTML=`<div class="flex-sb" style="margin-bottom:8px">
@@ -861,6 +943,162 @@ function rRank(div){
       c.appendChild(gr);div.appendChild(c);
     });
   }
+}
+
+function renderSquadAsList(container,sq,f){
+  let total=0;
+  PS.forEach(pn=>{
+    const slot=(sq.slots||[]).find(s=>s?.pos===pn);
+    const j=slot?JL.find(x=>x.id===slot.jid):null;
+    const row=document.createElement('div');row.className='prow';
+    if(j){
+      const isK=sq.kicker===j.id,isC=sq.capitan===j.id;
+      const pts=slotPtsRaw(sq,slot,f);total+=pts;
+      row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span>
+        <span style="flex:1;font-size:13px;font-weight:500">${j.nombre}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''} <span style="font-size:11px;color:var(--text-secondary)">${j.equipo}</span></span>
+        <span class="badge bb">${pts} pts</span>`;
+      row.style.cursor='pointer';
+      row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+    } else {
+      row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span><span style="flex:1;font-size:13px;color:var(--text-secondary)">— vacío —</span>`;
+    }
+    container.appendChild(row);
+  });
+  return total;
+}
+
+function rRendimiento(div){
+  div.innerHTML='<div class="st">Rendimiento</div><p class="ht">Tu equipo, el mejor equipo de la fecha entre todos los usuarios, y el equipo ideal — todo en formato lista.</p>';
+  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  ALL_FECHAS.forEach(f=>{
+    const b=document.createElement('button');b.className='ftab'+((S.rendFecha||getRoundStatus().fecha)===f?' active':'');
+    b.textContent=`F${f} · ${FDATES[f]}`;b.onclick=()=>{S.rendFecha=f;r()};ftabs.appendChild(b);
+  });
+  div.appendChild(ftabs);
+  const f=S.rendFecha||getRoundStatus().fecha;
+
+  // Mi equipo (lista)
+  const myTeam=mainTeam(S.equipos);
+  const h1=document.createElement('div');h1.className='st';h1.style.marginTop='.5rem';h1.textContent='Mi equipo';div.appendChild(h1);
+  if(myTeam){
+    const card=document.createElement('div');card.className='card';
+    const mySq=squadForFecha(myTeam,f);
+    const myTotal=renderSquadAsList(card,mySq,f);
+    div.appendChild(card);
+    const tot=document.createElement('div');tot.style.cssText='text-align:right;margin:-.5rem 0 1rem';
+    tot.innerHTML=`<span class="badge bg" style="font-size:14px;padding:3px 12px">${myTotal} pts</span>`;
+    div.appendChild(tot);
+  }
+
+  // Mejor equipo de la fecha
+  const usuarios=groupByUser(S.allEquipos).filter(u=>u.team);
+  let best=null,bestPts=-1;
+  usuarios.forEach(u=>{
+    const p=ceqf(u.team,f);
+    if(p>bestPts){bestPts=p;best=u;}
+  });
+  if(best){
+    const h2=document.createElement('div');h2.className='st';h2.style.marginTop='1.5rem';h2.textContent='Mejor equipo de la fecha';div.appendChild(h2);
+    const bc=document.createElement('div');bc.className='card';
+    const isMe=best.uid===S.session.user.id;
+    bc.innerHTML=`<div class="flex-sb"><div><div style="font-size:14px;font-weight:500">${isMe?'Vos · ':''}${best.team.apodo||best.email||'Jugador'}</div><div style="font-size:11px;color:var(--text-secondary)">${best.team.nombre}</div></div><span class="badge bg" style="font-size:15px;padding:4px 12px">${bestPts} pts</span></div>`;
+    const vb=document.createElement('button');vb.textContent='Ver equipo';vb.style.marginTop='.5rem';
+    vb.onclick=()=>{S.modal={type:'teamview',squad:squadForFecha(best.team,f),fecha:f,label:(best.team.apodo||best.email||'Jugador')};r()};
+    bc.appendChild(vb);
+    div.appendChild(bc);
+  }
+
+  // Equipo ideal (lista)
+  const h3=document.createElement('div');h3.className='st';h3.style.marginTop='1.5rem';h3.textContent='Equipo ideal de la fecha';div.appendChild(h3);
+  const idealCard=document.createElement('div');idealCard.className='card';
+  const ideal=buildIdealTeam(f);
+  const idealTotal=renderSquadAsList(idealCard,{slots:ideal.slots,kicker:ideal.kicker,capitan:ideal.capitan},f);
+  div.appendChild(idealCard);
+  const idealTot=document.createElement('div');idealTot.style.cssText='text-align:right;margin:-.5rem 0 1.5rem';
+  idealTot.innerHTML=`<span class="badge bg" style="font-size:14px;padding:3px 12px">${idealTotal} pts</span>`;
+  div.appendChild(idealTot);
+
+  // Gráfico de puestos
+  const h4=document.createElement('div');h4.className='st';h4.textContent='Puestos más performantes';div.appendChild(h4);
+  const legend=document.createElement('div');legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem';
+  POS_GROUPS.forEach(pg=>{
+    const s=document.createElement('span');s.style.cssText=`font-size:11px;padding:3px 10px;border-radius:20px;background:${pg.color}22;color:${pg.color};border:1px solid ${pg.color}55`;
+    s.textContent=pg.name;legend.appendChild(s);
+  });
+  div.appendChild(legend);
+  const participants=[
+    ...(myTeam?[{label:'Yo',eq:squadForFecha(myTeam,f)}]:[]),
+    ...S.amigos.map(a=>({label:a.nombre,eq:{slots:a.equipo?.slots||[],kicker:a.equipo?.kicker||null,capitan:a.equipo?.capitan||null}})),
+    {label:'Ideal',eq:ideal}
+  ];
+  const maxTotal=Math.max(1,...participants.map(p=>ceqf(p.eq,f)));
+  const chart=document.createElement('div');chart.className='card';
+  chart.style.cssText+=';display:flex;align-items:flex-end;gap:18px;height:240px;padding:1.5rem 1rem 1rem;overflow-x:auto';
+  participants.forEach(p=>{
+    const g=groupPts(p.eq,f);
+    const total=ceqf(p.eq,f);
+    const barWrap=document.createElement('div');barWrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:8px;min-width:64px;flex-shrink:0';
+    const bar=document.createElement('div');bar.style.cssText=`width:40px;height:${Math.max(4,(total/maxTotal)*180)}px;display:flex;flex-direction:column-reverse;border-radius:6px;overflow:hidden;border:0.5px solid var(--border)`;
+    POS_GROUPS.forEach(pg=>{
+      const val=g[pg.name]||0;
+      if(val<=0)return;
+      const seg=document.createElement('div');
+      seg.style.cssText=`background:${pg.color};height:${total>0?(val/total)*100:0}%;width:100%`;
+      seg.title=`${pg.name}: ${val} pts`;
+      bar.appendChild(seg);
+    });
+    barWrap.appendChild(bar);
+    const lbl=document.createElement('div');lbl.style.cssText='font-size:11px;text-align:center;color:var(--text-secondary);line-height:1.3';
+    lbl.innerHTML=`${p.label}<br><b style="color:var(--text-primary);font-size:13px">${total}</b>`;
+    barWrap.appendChild(lbl);
+    chart.appendChild(barWrap);
+  });
+  div.appendChild(chart);
+}
+
+function rAlineaciones(div){
+  div.innerHTML='<div class="st">Alineaciones</div><p class="ht">Elegí un equipo del torneo y una fecha para ver su alineación confirmada, con los puntos virtuales de cada jugador.</p>';
+  const eqRow=document.createElement('div');eqRow.style.marginBottom='.75rem';
+  const sel=document.createElement('select');
+  ETDI.slice().sort((a,b)=>a.n.localeCompare(b.n)).forEach(e=>{
+    const o=document.createElement('option');o.value=e.n;o.textContent=e.n;
+    if((S.alinEquipo||ETDI[0].n)===e.n)o.selected=true;
+    sel.appendChild(o);
+  });
+  sel.onchange=e=>{S.alinEquipo=e.target.value;r()};
+  eqRow.appendChild(sel);div.appendChild(eqRow);
+
+  const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  ALL_FECHAS.forEach(f=>{
+    const b=document.createElement('button');b.className='ftab'+((S.alinFecha||getRoundStatus().fecha)===f?' active':'');
+    b.textContent=`F${f} · ${FDATES[f]}`;b.onclick=()=>{S.alinFecha=f;r()};ftabs.appendChild(b);
+  });
+  div.appendChild(ftabs);
+
+  const equipo=S.alinEquipo||ETDI[0].n;
+  const f=S.alinFecha||getRoundStatus().fecha;
+  const plantel=JL.filter(j=>j.equipo===equipo&&(gs(j,f).titular||gs(j,f).suplente));
+  if(!plantel.length){
+    div.innerHTML+=`<div class="card"><p style="font-size:14px;color:var(--text-secondary);text-align:center;padding:1rem">No hay alineación confirmada de ${equipo} para la Fecha ${f} todavía.</p></div>`;
+    return;
+  }
+  const titulares=plantel.filter(j=>gs(j,f).titular).sort((a,b)=>a.puesto-b.puesto);
+  const suplentes=plantel.filter(j=>gs(j,f).suplente).sort((a,b)=>a.puesto-b.puesto);
+  [['Titulares',titulares],['Suplentes',suplentes]].forEach(([label,arr])=>{
+    if(!arr.length)return;
+    const c=document.createElement('div');c.className='card';
+    c.innerHTML=`<div class="zh">${label}</div>`;
+    arr.forEach(j=>{
+      const pts=cpf(j,false,f),ptsK=cpf(j,true,f);
+      const row=document.createElement('div');row.className='prow';row.style.cursor='pointer';
+      row.innerHTML=`<span style="font-size:11px;color:var(--text-secondary);min-width:24px">${j.puesto||'?'}</span>
+        <span style="flex:1;font-size:13px;font-weight:500">${j.nombre}</span>
+        <span class="badge bb" style="margin-right:4px">${pts}</span>${ptsK!==pts?`<span class="badge ba">${ptsK}kick</span>`:''}`;
+      row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+      c.appendChild(row);
+    });
+    div.appendChild(c);
+  });
 }
 
 function rIdeal(div){
