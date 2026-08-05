@@ -115,6 +115,43 @@ const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const sb=supabase.createClient(SURL,SKEY);
 
 const ETDI=[{n:"Marista RC",z:1},{n:"GER",z:1},{n:"Mendoza RC",z:1},{n:"Tucumán Rugby",z:1},{n:"Tala RC",z:2},{n:"Estudiantes Paraná",z:2},{n:"CURNE",z:2},{n:"Urú Curé",z:2},{n:"Jockey Rosario",z:3},{n:"Universitario Cba.",z:3},{n:"Córdoba Athletic",z:3},{n:"Santa Fe Rugby",z:3},{n:"Duendes RC",z:4},{n:"Jockey Córdoba",z:4},{n:"La Tablada",z:4},{n:"Old Resian",z:4}];
+const TEAM_JERSEY={
+  'Tala RC':{type:'hoops',c1:'#1a1a1a',c2:'#f2efe6'},
+  'CURNE':{type:'solid',c1:'#f0b429',c2:'#1a1a2e'},
+  'GER':{type:'hoops',c1:'#f0b429',c2:'#1a2a5e'},
+  'Tucumán Rugby':{type:'halves',c1:'#204d33',c2:'#151515'},
+  'Marista RC':{type:'hoopsThin',c1:'#ffffff',c2:'#c8262c'},
+  'Mendoza RC':{type:'solid',c1:'#e9e9e4',c2:'#1a2a5e'},
+  'Urú Curé':{type:'quarters',c1:'#0d1f52',c2:'#ffffff'},
+  'Estudiantes Paraná':{type:'halves',c1:'#151515',c2:'#ffffff'},
+  'Jockey Rosario':{type:'hoops',c1:'#1c6b3c',c2:'#ffffff'},
+  'Córdoba Athletic':{type:'quarters',c1:'#151515',c2:'#c8262c'},
+  'Universitario Cba.':{type:'halves',c1:'#ffffff',c2:'#c8262c'},
+  'Santa Fe Rugby':{type:'hoopsThin',c1:'#0d1f52',c2:'#c8262c'},
+  'Duendes RC':{type:'quarters',c1:'#1c6b3c',c2:'#151515'},
+  'La Tablada':{type:'hoops',c1:'#0d1f52',c2:'#c8262c'},
+  'Old Resian':{type:'hoopsThin',c1:'#0d1f52',c2:'#c8262c',c3:'#ffffff'},
+  'Jockey Córdoba':{type:'hoops',c1:'#c8262c',c2:'#ffffff'}
+};
+function jerseySVG(equipo,size){
+  const cfg=TEAM_JERSEY[equipo]||{type:'solid',c1:'#5b6b73',c2:'#2e3a40'};
+  const id='jz'+Math.random().toString(36).slice(2,9);
+  const shirt='M8,4 L14,2 Q20,7 26,2 L32,4 L37,11 L30,15 L30,37 L10,37 L10,15 L3,11 Z';
+  let fill='';
+  if(cfg.type==='solid'){fill=`<rect width="40" height="40" fill="${cfg.c1}"/>`;}
+  else if(cfg.type==='halves'){fill=`<rect width="20" height="40" fill="${cfg.c1}"/><rect x="20" width="20" height="40" fill="${cfg.c2}"/>`;}
+  else if(cfg.type==='quarters'){fill=`<rect width="20" height="20" fill="${cfg.c1}"/><rect x="20" width="20" height="20" fill="${cfg.c2}"/><rect y="20" width="20" height="20" fill="${cfg.c2}"/><rect x="20" y="20" width="20" height="20" fill="${cfg.c1}"/>`;}
+  else if(cfg.type==='hoops'){const n=5,h=40/n,arr=[];for(let i=0;i<n;i++)arr.push(`<rect y="${i*h}" width="40" height="${h}" fill="${i%2===0?cfg.c1:cfg.c2}"/>`);fill=arr.join('');}
+  else if(cfg.type==='hoopsThin'){const cols=cfg.c3?[cfg.c1,cfg.c2,cfg.c3]:[cfg.c1,cfg.c2];const n=9,h=40/n,arr=[];for(let i=0;i<n;i++)arr.push(`<rect y="${i*h}" width="40" height="${h}" fill="${cols[i%cols.length]}"/>`);fill=arr.join('');}
+  return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <defs><clipPath id="${id}"><path d="${shirt}"/></clipPath></defs>
+    <g clip-path="url(#${id})">${fill}</g>
+    <path d="${shirt}" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="1.2"/>
+  </svg>`;
+}
+function jerseyBadge(equipo,pn,size){
+  return `<span style="position:relative;display:inline-flex">${jerseySVG(equipo,size||28)}<span style="position:absolute;top:-4px;right:-5px;background:#0b1f14;color:#fff;font-size:8px;font-weight:700;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3)">${pn}</span></span>`;
+}
 const PN={1:"Pilar",2:"Pilar",3:"Hooker",4:"Cerrojo",5:"Cerrojo",6:"Ala",7:"Ala",8:"N°8",9:"Medio Scrum",10:"Apertura",11:"Wing",12:"Centro",13:"Centro",14:"Wing",15:"Fullback"};
 const PS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 const DEL=[1,2,3,4,5,6,7,8],BCK=[9,10,11,12,13,14,15];
@@ -555,7 +592,7 @@ function rEqDet(div,eq){
       const card=document.createElement('div');card.className='pos-card'+(j?' filled':'');
       const ptsShown=j?(fechaArg?slotPtsRaw(viewSquad,slot,fechaArg):slotPts(eq,slot)):0;
       card.innerHTML=j?
-        `<span class="jersey">${pn}</span><span class="poslabel">${PN[pn]}</span>
+        `${jerseyBadge(j.equipo,pn)}<span class="poslabel">${PN[pn]}</span>
          <span class="pname">${j.nombre.split(',')[0]}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''}</span>
          <span class="ppts">${j.equipo}</span>
          <span class="badge bg" style="margin-top:2px">${ptsShown} pts</span>`
@@ -1209,7 +1246,7 @@ function rIdeal(div){
       const isC=!!j&&ideal.capitan===j.id;
       const card=document.createElement('div');card.className='pos-card'+(j?' filled':'');
       card.innerHTML=j?
-        `<span class="jersey">${pn}</span><span class="poslabel">${PN[pn]}</span>
+        `${jerseyBadge(j.equipo,pn)}<span class="poslabel">${PN[pn]}</span>
          <span class="pname">${j.nombre.split(',')[0]}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''}</span>
          <span class="ppts">${j.equipo}</span>
          <span class="badge bg" style="margin-top:2px">${slotPts(ideal,slot,f)} pts</span>`
