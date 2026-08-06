@@ -285,6 +285,34 @@ function buildIdealTeam(f){
   const eqSlots=Object.keys(slots).map(pn=>({pos:parseInt(pn),jid:slots[pn].id}));
   return{nombre:'Equipo ideal',slots:eqSlots,kicker:kicker?kicker.id:null,capitan:capitan?capitan.id:null};
 }
+function buildIdealTeamTotal(metric){
+  const value=j=>metric==='prom'?avgPtsG(j):cpt(j,false);
+  const candidates=JL.filter(j=>value(j)>0||ALL_FECHAS.some(f=>{const s=gs(j,f);return s.titular||s.suplente}));
+  let kicker=null,kickerVal=0;
+  candidates.forEach(j=>{const val=kickingPtsG(j);if(val>kickerVal){kickerVal=val;kicker=j;}});
+  const slots={};const teamCount={};
+  function groupOf(puesto){return POS_GROUPS.find(g=>g.pos.includes(puesto));}
+  function tryAssign(j){
+    const grp=groupOf(j.puesto);
+    if(!grp)return false;
+    let targetPos=(j.puesto>=1&&j.puesto<=15&&!slots[j.puesto])?j.puesto:grp.pos.find(p=>!slots[p]);
+    if(targetPos===undefined||targetPos===null)return false;
+    if((teamCount[j.equipo]||0)>=MAX_POR_EQUIPO)return false;
+    slots[targetPos]=j;teamCount[j.equipo]=(teamCount[j.equipo]||0)+1;
+    return true;
+  }
+  if(kicker)tryAssign(kicker);
+  const rest1=candidates.filter(j=>j!==kicker).sort((a,b)=>value(b)-value(a));
+  let capitan=rest1.length?rest1[0]:null;
+  if(capitan)tryAssign(capitan);
+  const rest=rest1.filter(j=>j!==capitan);
+  POS_GROUPS.forEach(grp=>{
+    rest.filter(j=>grp.pos.includes(j.puesto))
+        .forEach(j=>{if(grp.pos.every(p=>slots[p]))return;tryAssign(j);});
+  });
+  const eqSlots=Object.keys(slots).map(pn=>({pos:parseInt(pn),jid:slots[pn].id}));
+  return{nombre:'Equipo ideal total',slots:eqSlots,kicker:kicker?kicker.id:null,capitan:capitan?capitan.id:null};
+}
 function teamCounts(eq,excludePos){
   const c={};
   (eq.slots||[]).forEach(s=>{
@@ -1023,6 +1051,56 @@ function renderSquadAsList(container,sq,f){
 
 function rRendimiento(div){
   div.innerHTML='<div class="st">Rendimiento</div>';
+
+  // Subpestañas (siempre visibles)
+  const subtabs=document.createElement('div');subtabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap';
+  const subOpts=[['tuequipo','Tu equipo'],['top20','Top 20'],['fecha','Equipo de la fecha'],['pop','Más elegidos'],['idealtotal','Ideal total']];
+  subOpts.forEach(([v,l])=>{
+    const b=document.createElement('button');b.className='ftab'+((S.rendSub||'tuequipo')===v?' active':'');
+    b.textContent=l;b.onclick=()=>{S.rendSub=v;r()};subtabs.appendChild(b);
+  });
+  div.appendChild(subtabs);
+  const sub=S.rendSub||'tuequipo';
+
+  if(sub==='idealtotal'){
+    const p=document.createElement('p');p.className='ht';p.textContent='El mejor equipo posible sumando todas las fechas jugadas hasta ahora, en dos versiones: por PV Acumulado o por PV Promedio.';
+    div.appendChild(p);
+    const mtabs=document.createElement('div');mtabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem';
+    [['acum','PV Acumulado'],['prom','PV Promedio']].forEach(([v,l])=>{
+      const b=document.createElement('button');b.className='sort-tab'+((S.idealTotalMetric||'acum')===v?' active':'');
+      b.textContent=l;b.onclick=()=>{S.idealTotalMetric=v;r()};mtabs.appendChild(b);
+    });
+    div.appendChild(mtabs);
+    const metric=S.idealTotalMetric||'acum';
+    const idealT=buildIdealTeamTotal(metric);
+    const card=document.createElement('div');card.className='card';
+    let total=0;
+    PS.forEach(pn=>{
+      const slot=(idealT.slots||[]).find(s=>s.pos===pn);
+      const j=slot?JL.find(x=>x.id===slot.jid):null;
+      const row=document.createElement('div');row.className='prow';
+      if(j){
+        const isK=idealT.kicker===j.id,isC=idealT.capitan===j.id;
+        const base=metric==='prom'?avgPtsG(j):cpt(j,false);
+        const shown=isC?base*2:base;
+        total+=shown;
+        row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span>
+          <span style="flex:1;font-size:13px;font-weight:500">${j.nombre}${isK?' 🥾':''}${isC?' <span class="badge ba" style="font-size:8px">C</span>':''} <span style="font-size:11px;color:var(--text-secondary)">${j.equipo}</span></span>
+          <span class="badge bb">${metric==='prom'?shown.toFixed(1):shown}</span>`;
+        row.style.cursor='pointer';
+        row.onclick=()=>{S.modal={type:'playerinfo',jid:j.id};r()};
+      } else {
+        row.innerHTML=`<span style="font-size:10px;color:var(--text-secondary);min-width:60px">${pn}. ${PN[pn]}</span><span style="flex:1;font-size:13px;color:var(--text-secondary)">— vacío —</span>`;
+      }
+      card.appendChild(row);
+    });
+    div.appendChild(card);
+    const totRow=document.createElement('div');totRow.style.cssText='text-align:right;margin-top:.5rem';
+    totRow.innerHTML=`<span class="badge bg" style="font-size:14px;padding:3px 12px">${metric==='prom'?total.toFixed(1):total} ${metric==='prom'?'prom. total':'pts'}</span>`;
+    div.appendChild(totRow);
+    return;
+  }
+
   const ftabs=document.createElement('div');ftabs.style.cssText='display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;overflow-x:auto';
   ALL_FECHAS.forEach(f=>{
     const b=document.createElement('button');b.className='ftab'+((S.rendFecha||getRoundStatus().fecha)===f?' active':'');
@@ -1058,16 +1136,6 @@ function rRendimiento(div){
   </div>`;
   div.appendChild(summary);
 
-  // Subpestañas
-  const subtabs=document.createElement('div');subtabs.style.cssText='display:flex;gap:6px;margin:1rem 0;flex-wrap:wrap';
-  const subOpts=[['tuequipo','Tu equipo'],['top20','Top 20'],['fecha','Equipo de la fecha'],['pop','Más elegidos']];
-  subOpts.forEach(([v,l])=>{
-    const b=document.createElement('button');b.className='ftab'+((S.rendSub||'tuequipo')===v?' active':'');
-    b.textContent=l;b.onclick=()=>{S.rendSub=v;r()};subtabs.appendChild(b);
-  });
-  div.appendChild(subtabs);
-
-  const sub=S.rendSub||'tuequipo';
   const content=document.createElement('div');
 
   if(sub==='tuequipo'){
