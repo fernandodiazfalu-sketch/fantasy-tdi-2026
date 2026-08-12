@@ -152,7 +152,7 @@ function jerseySVG(equipo,size){
 function jerseyBadge(equipo,pn,size){
   return `<span style="position:relative;display:inline-flex">${jerseySVG(equipo,size||28)}<span style="position:absolute;top:-4px;right:-5px;background:#0b1f14;color:#fff;font-size:8px;font-weight:700;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3)">${pn}</span></span>`;
 }
-const PN={1:"Pilar",2:"Pilar",3:"Hooker",4:"Cerrojo",5:"Cerrojo",6:"Ala",7:"Ala",8:"N°8",9:"Medio Scrum",10:"Apertura",11:"Wing",12:"Centro",13:"Centro",14:"Wing",15:"Fullback"};
+const PN={1:"Pilar",2:"Hooker",3:"Pilar",4:"Cerrojo",5:"Cerrojo",6:"Ala",7:"Ala",8:"N°8",9:"Medio Scrum",10:"Apertura",11:"Wing",12:"Centro",13:"Centro",14:"Wing",15:"Fullback"};
 const PS=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 const DEL=[1,2,3,4,5,6,7,8],BCK=[9,10,11,12,13,14,15];
 const PC={try:5,conv:2,pen:3,drop:4,am:-5,ro:-10,bon:2,tit:3,sup:1};
