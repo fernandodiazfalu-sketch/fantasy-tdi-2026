@@ -171,6 +171,17 @@ function getRoundStatus(){
   }
   return{fecha:ALL_FECHAS[ALL_FECHAS.length-1],deadline:new Date(FECHA_DEADLINES[ALL_FECHAS[ALL_FECHAS.length-1]]),open:false};
 }
+function currentRoundTeams(){
+  const status=getRoundStatus();
+  const dl=FECHA_DEADLINES[status.fecha];
+  const sameDayFechas=ALL_FECHAS.filter(f=>FECHA_DEADLINES[f]===dl);
+  const union=new Set();
+  let any=false;
+  sameDayFechas.forEach(f=>{
+    if(ROUND_TEAMS[f]){any=true;ROUND_TEAMS[f].forEach(t=>union.add(t));}
+  });
+  return any?Array.from(union):null;
+}
 const ROUND_TEAMS={"8": ["Duendes RC", "Estudiantes Paraná", "Jockey Córdoba", "Jockey Rosario", "Marista RC", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby"], "7": ["CURNE", "Córdoba Athletic", "GER", "La Tablada", "Mendoza RC", "Old Resian", "Universitario Cba.", "Urú Curé"], "6": ["CURNE", "Córdoba Athletic", "Duendes RC", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"], "5": ["CURNE", "Córdoba Athletic", "Duendes RC", "Estudiantes Paraná", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"], "4": ["CURNE", "Córdoba Athletic", "Duendes RC", "Estudiantes Paraná", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"], "3": ["CURNE", "Córdoba Athletic", "Duendes RC", "Estudiantes Paraná", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"], "2": ["CURNE", "Córdoba Athletic", "Duendes RC", "Estudiantes Paraná", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"], "1": ["CURNE", "Córdoba Athletic", "Duendes RC", "Estudiantes Paraná", "GER", "Jockey Córdoba", "Jockey Rosario", "La Tablada", "Marista RC", "Mendoza RC", "Old Resian", "Santa Fe Rugby", "Tala RC", "Tucumán Rugby", "Universitario Cba.", "Urú Curé"]};
 const MAX_POR_EQUIPO=2;
 
@@ -828,7 +839,7 @@ function renderModal(root){
       const fresh=S.equipos.find(e=>e.id===m.eqId);if(!fresh)return;
       const counts=teamCounts(fresh,pn);
       const curFechaForPick=getRoundStatus().fecha;
-      const teamsPlayingNow=ROUND_TEAMS[curFechaForPick];
+      const teamsPlayingNow=currentRoundTeams();
       let jj=JL.filter(j=>{
         if(!j.nombre.toLowerCase().includes(q.toLowerCase())&&!j.equipo.toLowerCase().includes(q.toLowerCase()))return false;
         if(S.modalPosFilter==='exact'){const grp=POS_GROUPS.find(g=>g.pos.includes(pn));return grp?grp.pos.includes(j.puesto):j.puesto===pn;}
