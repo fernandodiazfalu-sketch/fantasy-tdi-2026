@@ -295,11 +295,8 @@ function buildIdealTeam(f){
   let capitan=rest1.length?rest1[0]:null;
   if(capitan)tryAssign(capitan);
   const rest=rest1.filter(j=>j!==capitan);
-  // Fill each real position line only with candidates from that same line
-  POS_GROUPS.forEach(grp=>{
-    rest.filter(j=>grp.pos.includes(j.puesto))
-        .forEach(j=>{if(grp.pos.every(p=>slots[p]))return;tryAssign(j);});
-  });
+  // Un solo recorrido por puntaje global: cada jugador entra a su puesto si está libre y su equipo no llegó al tope
+  rest.forEach(j=>tryAssign(j));
   const eqSlots=Object.keys(slots).map(pn=>({pos:parseInt(pn),jid:slots[pn].id}));
   return{nombre:'Equipo ideal',slots:eqSlots,kicker:kicker?kicker.id:null,capitan:capitan?capitan.id:null};
 }
@@ -324,10 +321,7 @@ function buildIdealTeamTotal(metric){
   let capitan=rest1.length?rest1[0]:null;
   if(capitan)tryAssign(capitan);
   const rest=rest1.filter(j=>j!==capitan);
-  POS_GROUPS.forEach(grp=>{
-    rest.filter(j=>grp.pos.includes(j.puesto))
-        .forEach(j=>{if(grp.pos.every(p=>slots[p]))return;tryAssign(j);});
-  });
+  rest.forEach(j=>tryAssign(j));
   const eqSlots=Object.keys(slots).map(pn=>({pos:parseInt(pn),jid:slots[pn].id}));
   return{nombre:'Equipo ideal total',slots:eqSlots,kicker:kicker?kicker.id:null,capitan:capitan?capitan.id:null};
 }
