@@ -826,7 +826,7 @@ function renderModal(root){
     modal.innerHTML=`<div style="font-size:15px;font-weight:500;margin-bottom:.25rem">Puesto ${pn} · ${PN[pn]}</div>
       <p style="font-size:12px;color:var(--text-secondary);margin-bottom:.5rem">Filtrá por posición real del jugador. Máximo ${maxCapNow} jugadores por equipo real (a partir de ahora).</p>`;
     const ptabs=document.createElement('div');ptabs.style.cssText='display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap';
-    (isDel?[['exact',`${groupForPuesto(pn)}`],['all','Todos'],['del','Delanteros 1-8'],['f6','Alineados F6']]:[['exact',`${groupForPuesto(pn)}`],['all','Todos'],['bk','Backs 9-15'],['f6','Alineados F6']]).forEach(([v,l])=>{
+    (isDel?[['exact',`${groupForPuesto(pn)}`],['all','Todos'],['del','Delanteros 1-8'],['f6',`Alineados F${curFechaForPick}`]]:[['exact',`${groupForPuesto(pn)}`],['all','Todos'],['bk','Backs 9-15'],['f6',`Alineados F${curFechaForPick}`]]).forEach(([v,l])=>{
       const b=document.createElement('button');b.className='pos-tab'+(S.modalPosFilter===v?' active':'');
       b.textContent=l;b.onclick=()=>{S.modalPosFilter=v;fr(S.modalSearch)};ptabs.appendChild(b);
     });
@@ -854,7 +854,7 @@ function renderModal(root){
         if(S.modalPosFilter==='exact'){const grp=POS_GROUPS.find(g=>g.pos.includes(pn));return grp?grp.pos.includes(j.puesto):j.puesto===pn;}
         if(S.modalPosFilter==='del')return j.puesto>=1&&j.puesto<=8;
         if(S.modalPosFilter==='bk')return j.puesto>=9&&j.puesto<=15;
-        if(S.modalPosFilter==='f6')return !!gs(j,6).titular||!!gs(j,6).suplente;
+        if(S.modalPosFilter==='f6')return !!gs(j,curFechaForPick).titular||!!gs(j,curFechaForPick).suplente;
         return true;
       });
       const sortMode=S.modalSort||'pts';
@@ -866,8 +866,8 @@ function renderModal(root){
       jj.forEach(j=>{
         const inEq=(fresh.slots||[]).some(s=>s?.jid===j.id&&s.pos!==pn);
         const pts=cpt(j,false);const ptsK=cpt(j,true);const prom=avgPts(j);
-        const s6=gs(j,6);
-        const f6badge=s6.titular?'<span class="badge bt" style="font-size:9px">Titular F6</span>':s6.suplente?'<span class="badge bg2" style="font-size:9px">Suplente F6</span>':'';
+        const s6=gs(j,curFechaForPick);
+        const f6badge=s6.titular?`<span class="badge bt" style="font-size:9px">Titular F${curFechaForPick}</span>`:s6.suplente?`<span class="badge bg2" style="font-size:9px">Suplente F${curFechaForPick}</span>`:'';
         const wouldExceed=(counts[j.equipo]||0)>=maxCapNow && !inEq;
         const teamRests=teamsPlayingNow&&!teamsPlayingNow.includes(j.equipo);
         const blocked=wouldExceed||teamRests;
