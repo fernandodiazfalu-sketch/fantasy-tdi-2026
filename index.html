@@ -823,6 +823,7 @@ function renderModal(root){
   } else {
     const pn=m.posNum;const isDel=DEL.includes(pn);
     const maxCapNow=maxPorEquipoForFecha(getRoundStatus().fecha);
+    const curFechaForPick=getRoundStatus().fecha;
     modal.innerHTML=`<div style="font-size:15px;font-weight:500;margin-bottom:.25rem">Puesto ${pn} · ${PN[pn]}</div>
       <p style="font-size:12px;color:var(--text-secondary);margin-bottom:.5rem">Filtrá por posición real del jugador. Máximo ${maxCapNow} jugadores por equipo real (a partir de ahora).</p>`;
     const ptabs=document.createElement('div');ptabs.style.cssText='display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap';
@@ -847,7 +848,6 @@ function renderModal(root){
       S.modalSearch=q;list.innerHTML='';
       const fresh=S.equipos.find(e=>e.id===m.eqId);if(!fresh)return;
       const counts=teamCounts(fresh,pn);
-      const curFechaForPick=getRoundStatus().fecha;
       const teamsPlayingNow=currentRoundTeams();
       let jj=JL.filter(j=>{
         if(!j.nombre.toLowerCase().includes(q.toLowerCase())&&!j.equipo.toLowerCase().includes(q.toLowerCase()))return false;
